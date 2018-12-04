@@ -8,4 +8,4 @@ Some examples:
 
 ![Loading Failed](style0.jpg)
 
-![Loading Failed](generate.jpg)
+![Loading Failed](merge.jpg)
