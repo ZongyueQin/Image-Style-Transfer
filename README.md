@@ -4,8 +4,9 @@ Based on paper **Image Style Transfer Using Convolutional Neural Network**, my o
 Use command ***python StyleTransfer -c content_picture_name -s style_picture_name*** to run 
 
 Some examples:
-![Loading Failed](content0.jpg)
 
-![Loading Failed](style0.jpg)
-
-![Loading Failed](merge.jpg)
+<figure class="third">
+  <img src="content0.jpg", width="150", height="150">
+  <img src="style0.jpg", width="150", height="150">
+  <img src="merge.jpg", width="150", height="150">
+<\figure>
