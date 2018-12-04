@@ -6,5 +6,5 @@ Use command ***python StyleTransfer -c content_picture_name -s style_picture_nam
 Some examples:
 
 <figure class="third">
-  <img src="content0.jpg"><img src="style0.jpg"><img src="merge.jpg">
+  <img src="content0.jpg",width="300"/><img src="style0.jpg",width="300"/><img src="merge.jpg",width="400"/>
 </figure>
