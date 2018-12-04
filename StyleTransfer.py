@@ -6,75 +6,115 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
-import torchvision
-from torchvision import models, datasets, transforms
+from torchvision import models, transforms
 import matplotlib.pyplot as plt
-import os
-import time
-import copy
-from matplotlib.image import imread
 import argparse
 import cv2 as cv
 import pickle
 
-class StyleTransfer:
+dft_content_features_layer = ['conv_4', 'conv_5']
+dft_style_features_layer = ['conv_4']
+
+class Gram(nn.Module):
+    def __init__(self):
+        super().__init__()
+        
+    def forward(self, x):
+        newx = x.view(x.size(0), x.size(1), -1)
+        newx_T = torch.transpose(newx, 1, 2)
+        return torch.matmul(newx, newx_T)
+
+class model(nn.Module):
     
-    def __init__(self, step_size = 0.001):
-       self.vgg =  models.vgg11(pretrained=True)
-       for param in self.vgg.parameters():
-           param.requires_grad = False
- 
-       self.vgg.classifier = nn.Sequential(nn.ReLU(True)) # The classifier will give output exact same as input
-       self.step_size = step_size
-    
-    # merge content and style
-    def merge(self, content, style):
-       
+    def __init__(self, vgg = models.vgg19(pretrained=True), content_weight = 1,
+                 style_weight = 1, content_features_layer = dft_content_features_layer,
+                 style_features_layer = dft_style_features_layer):
+        super().__init__()
+        self.vgg = vgg
+        for param in self.vgg.parameters():
+            param.requires_grad = False
+        self.content_w = content_weight
+        self.style_w = style_weight
+        self.content_f_layer = content_features_layer
+        self.style_f_layer = style_features_layer
+        self.content_criterion = nn.MSELoss()
+        
+    def forward(self, x, content, style):
+        
+        gram = Gram()
+        content_feature = []
+        style_feature = []
+        content_feature_cnt = 0
+        style_feature_cnt = 0
+        i = 1
+        for layer in self.vgg.features:
+            x = layer(x)
+            content = layer(content)
+            style = layer(style)
+            
+            if isinstance(layer, nn.Conv2d):
+                name = "conv_" + str(i)
+                
+                if name in self.content_f_layer:
+                    content_feature_cnt = content_feature_cnt + 1
+                    content_feature.append([x.clone(), content.detach()])
+                if name in self.style_f_layer:
+                    style_feature_cnt = style_feature_cnt + 1
+                    style_feature.append([gram(x.clone()), gram(style.detach()), 
+                                          x.size(1), x.size(2) * x.size(3)])
+                    
+                if content_feature_cnt == len(self.content_f_layer) and\
+                    style_feature_cnt == len(self.style_f_layer):
+                    break
+                i = i + 1
+
+        loss = torch.zeros(1, requires_grad=True)
+
+        for pair in content_feature:
+            loss = loss + self.content_criterion(pair[0], pair[1]) * self.content_w
+
+        for pair in style_feature:
+            loss = loss +  self.content_criterion(pair[0], pair[1])\
+                    * self.style_w / (4 * (pair[2]**2) * (pair[3]**2))
+                    
+        return loss
+
+class ImageStyleTransfer():
+    def __init__(self, vgg = models.vgg19(pretrained=True), content_weight = 1,
+                 style_weight = 1000, content_features_layer = dft_content_features_layer,
+                 style_features_layer = dft_style_features_layer, step_size=100):
+        
+        self.model = model(vgg, content_weight, style_weight, content_features_layer,
+                           style_features_layer)
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         print(device)
-        self.vgg.to(device)
+        self.model.to(device)
+        self.device = device
+        self.step_size = step_size
         
-        # generate x randomly
-        x = torch.randn_like(content).unsqueeze(0)
-        x = x * 0.001
-        x.requires_grad_(True)
-        x.to(device)
-        
-        # extract features from content
-        content_output =  self.vgg(content.unsqueeze(0).to(device))
-        content_output.detach()
-
-        criterion = nn.MSELoss()
-#        optimizer = optim.SGD([{'params':x}], lr=self.step_size, momentum=0.9)   
+    def merge(self, content, style):
+        x = torch.randn_like(content, requires_grad = True)
+        x.to(self.device)
+        content.to(self.device)
+        style.to(self.device)
         optimizer = optim.LBFGS([{'params':x}])
-
         
-        
-        # training x        
-        for i in range(1000):
+        print("Start merging...")
+        for i in range(self.step_size):
             def closure():
                 optimizer.zero_grad()
-                output = self.vgg(x)
-                loss_content = criterion(output, content_output)
-                loss_content.backward()
-                return loss_content
+                loss = self.model(x, content, style)
+                loss.backward()
+                return loss
             
             optimizer.step(closure)
-            #self.vgg16.zero_grad()
-#            optimizer.zero_grad()
-#            output = self.vgg16(x)
-#            loss_content = criterion(output, content_output)
-        
-#            loss_content.backward()
-            #x.data = x.data - self.step_size * x.grad
-#            optimizer.step()
-            if i % 100 == 0:
-                output = self.vgg(x)
-                loss_content = criterion(output, content_output)
-                print("%d iterations, loss = %f"%(i, loss_content))
             
+            if i % 5 == 0:
+                loss = self.model(x, content, style)
+                print("After %d iterations, loss = %f"%(i, loss))
+        
         return x
-    
+
 
 if __name__ == "__main__":
 
@@ -100,10 +140,14 @@ if __name__ == "__main__":
     
     content_mat = transform(content_mat)
     style_mat = transform(style_mat)
+    content_mat = content_mat.unsqueeze(0)
+    style_mat = style_mat.unsqueeze(0)
+    content_mat.requires_grad = False
+    style_mat.requires_grad = False
     
     # merge content and style
-    transfer = StyleTransfer(step_size = 1)
-    x = transfer.merge(content_mat, style_mat)
+    merger = ImageStyleTransfer(style_weight=100000)
+    x = merger.merge(content_mat, style_mat)
     
     # save and show x
     x = x.squeeze()
@@ -115,7 +159,7 @@ if __name__ == "__main__":
     # during training x might be out of valid range, so make it more robust
     xnp[xnp<0] = 0
     xnp[xnp>1] = 1
-    print(xnp)
+    #print(xnp)
     plt.imshow(np.transpose(xnp,(1,2,0)))
     plt.savefig('generate.jpg')
     
