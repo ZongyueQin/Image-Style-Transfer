@@ -12,8 +12,8 @@ import argparse
 import cv2 as cv
 import pickle
 
-dft_content_features_layer = ['conv_4', 'conv_5']
-dft_style_features_layer = ['conv_4']
+dft_content_features_layer = ['conv_10']
+dft_style_features_layer = ['conv_1', 'conv_3', 'conv_5', 'conv_9']
 
 class Gram(nn.Module):
     def __init__(self):
@@ -109,7 +109,7 @@ class ImageStyleTransfer():
             
             optimizer.step(closure)
             
-            if i % 5 == 0:
+            if i % 10 == 0:
                 loss = self.model(x, content, style)
                 print("After %d iterations, loss = %f"%(i, loss))
         
@@ -130,6 +130,8 @@ if __name__ == "__main__":
     # read pictures
     content_mat = cv.imread(content_pic_name).astype(np.float32)
     style_mat = cv.imread(style_pic_name).astype(np.float32)
+
+    # TODO make sure content and style are of same sizes
     
     # transform picture matrices for vgg to hangle
     content_mat = content_mat / 255
@@ -146,7 +148,7 @@ if __name__ == "__main__":
     style_mat.requires_grad = False
     
     # merge content and style
-    merger = ImageStyleTransfer(style_weight=100000)
+    merger = ImageStyleTransfer(style_weight=10000, step_size = 20)
     x = merger.merge(content_mat, style_mat)
     
     # save and show x
