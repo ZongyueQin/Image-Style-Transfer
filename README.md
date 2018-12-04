@@ -9,4 +9,4 @@ Some examples:
   <img src="content0.jpg", width="150", height="150">
   <img src="style0.jpg", width="150", height="150">
   <img src="merge.jpg", width="150", height="150">
-<\figure>
+</figure>
