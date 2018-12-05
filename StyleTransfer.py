@@ -15,6 +15,13 @@ import pickle
 dft_content_features_layer = ['conv_10']
 dft_style_features_layer = ['conv_1', 'conv_3', 'conv_5', 'conv_9']
 
+def CenterCrop(x, crop_height, crop_width):
+    _, height, width = x.shape
+    start_h = height // 2 - crop_height // 2
+    start_w = width // 2 - crop_width // 2
+    return x[:,start_h:start_h+crop_height, start_w:start_w+crop_width]
+
+
 class Gram(nn.Module):
     def __init__(self):
         super().__init__()
@@ -132,7 +139,11 @@ if __name__ == "__main__":
     style_mat = cv.imread(style_pic_name).astype(np.float32)
 
     # TODO make sure content and style are of same sizes
-    
+    height = min(content_mat.shape[1], style_mat.shape[1])
+    width = min(content_mat.shape[2], style_mat.shape[2])
+    content_mat = CenterCrop(content_mat, height, width)
+    style_mat = CenterCrop(style_mat, height, width)
+
     # transform picture matrices for vgg to hangle
     content_mat = content_mat / 255
     style_mat = style_mat / 255    
@@ -163,6 +174,6 @@ if __name__ == "__main__":
     xnp[xnp>1] = 1
     #print(xnp)
     plt.imshow(np.transpose(xnp,(1,2,0)))
-    plt.savefig('generate.jpg')
+    plt.savefig(content_pic_name + style_pic_name + '.jpg')
     
     
