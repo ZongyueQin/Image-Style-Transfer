@@ -16,10 +16,10 @@ dft_content_features_layer = ['conv_10']
 dft_style_features_layer = ['conv_1', 'conv_3', 'conv_5', 'conv_9']
 
 def CenterCrop(x, crop_height, crop_width):
-    _, height, width = x.shape
+    height, width,_ = x.shape
     start_h = height // 2 - crop_height // 2
     start_w = width // 2 - crop_width // 2
-    return x[:,start_h:start_h+crop_height, start_w:start_w+crop_width]
+    return x[start_h:start_h+crop_height, start_w:start_w+crop_width,:]
 
 
 class Gram(nn.Module):
@@ -139,10 +139,12 @@ if __name__ == "__main__":
     style_mat = cv.imread(style_pic_name).astype(np.float32)
 
     # TODO make sure content and style are of same sizes
-    height = min(content_mat.shape[1], style_mat.shape[1])
-    width = min(content_mat.shape[2], style_mat.shape[2])
+    height = min(content_mat.shape[0], style_mat.shape[0])
+    width = min(content_mat.shape[1], style_mat.shape[1])
     content_mat = CenterCrop(content_mat, height, width)
     style_mat = CenterCrop(style_mat, height, width)
+    print(content_mat.shape)
+    print(style_mat.shape)
 
     # transform picture matrices for vgg to hangle
     content_mat = content_mat / 255
@@ -159,7 +161,7 @@ if __name__ == "__main__":
     style_mat.requires_grad = False
     
     # merge content and style
-    merger = ImageStyleTransfer(style_weight=10000, step_size = 20)
+    merger = ImageStyleTransfer(style_weight=10000, step_size = 30)
     x = merger.merge(content_mat, style_mat)
     
     # save and show x
@@ -169,6 +171,7 @@ if __name__ == "__main__":
     pickle.dump(x, open("x.dat","wb"))
     x = detransform(x.detach())
     xnp = x.numpy()
+    print(xnp.shape)
     # during training x might be out of valid range, so make it more robust
     xnp[xnp<0] = 0
     xnp[xnp>1] = 1
